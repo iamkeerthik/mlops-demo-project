@@ -1,11 +1,23 @@
+# VPC
 output "vpc_id" {
-  value = aws_vpc.this.id
+  description = "The ID of the created VPC"
+  value       = aws_vpc.this.id
 }
 
-output "public_subnet_id" {
-  value = aws_subnet.public.id
+# Public Subnet IDs
+output "public_subnet_ids" {
+  description = "List of public subnet IDs"
+  value       = [for s in aws_subnet.public : s.id]
 }
 
-output "private_subnet_id" {
-  value = aws_subnet.private.id
+# Private Subnet IDs (may be empty if no private subnets)
+output "private_subnet_ids" {
+  description = "List of private subnet IDs"
+  value       = [for s in aws_subnet.private : s.id]
+}
+
+# NAT Gateway ID (if created)
+output "nat_gateway_id" {
+  description = "NAT Gateway ID (if private subnets exist)"
+  value       = length(aws_nat_gateway.this) > 0 ? aws_nat_gateway.this[0].id : ""
 }

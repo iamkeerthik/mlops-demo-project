@@ -7,7 +7,7 @@ resource "aws_vpc" "this" {
   enable_dns_hostnames = true
 
   tags = {
-    Name = "${var.env}-vpc"
+    Name = "${var.env}-mlops-vpc"
     Env  = var.env
   }
 }
@@ -24,38 +24,43 @@ resource "aws_internet_gateway" "this" {
 }
 
 ############################
-# Public Subnet
+# Public Subnets
 ############################
 resource "aws_subnet" "public" {
+  for_each = { for idx, cidr in var.public_subnet_cidrs : idx => cidr }
+
   vpc_id                  = aws_vpc.this.id
-  cidr_block              = var.public_subnet_cidr
+  cidr_block              = each.value
   map_public_ip_on_launch = true
-  availability_zone       = "${var.aws_region}a"
+  availability_zone       = "${var.aws_region}${char(97 + each.key)}" # a, b, c ...
 
   tags = {
-    Name = "${var.env}-public-subnet"
+    Name = "${var.env}-public-subnet-${each.key + 1}"
     Tier = "public"
   }
 }
 
 ############################
-# Private Subnet
+# Private Subnets
 ############################
 resource "aws_subnet" "private" {
+  for_each = { for idx, cidr in var.private_subnet_cidrs : idx => cidr }
+
   vpc_id            = aws_vpc.this.id
-  cidr_block        = var.private_subnet_cidr
-  availability_zone = "${var.aws_region}a"
+  cidr_block        = each.value
+  availability_zone = "${var.aws_region}${char(97 + each.key)}"
 
   tags = {
-    Name = "${var.env}-private-subnet"
+    Name = "${var.env}-private-subnet-${each.key + 1}"
     Tier = "private"
   }
 }
 
 ############################
-# Elastic IP for NAT
+# NAT Gateway (only if private subnet exists)
 ############################
 resource "aws_eip" "nat" {
+  count  = length(var.private_subnet_cidrs) > 0 ? 1 : 0
   domain = "vpc"
 
   tags = {
@@ -63,12 +68,10 @@ resource "aws_eip" "nat" {
   }
 }
 
-############################
-# NAT Gateway
-############################
 resource "aws_nat_gateway" "this" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public.id
+  count         = length(var.private_subnet_cidrs) > 0 ? 1 : 0
+  allocation_id = aws_eip.nat[0].id
+  subnet_id     = aws_subnet.public[0].id
 
   tags = {
     Name = "${var.env}-nat-gateway"
@@ -94,19 +97,21 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_route_table_association" "public" {
-  subnet_id      = aws_subnet.public.id
+  for_each       = aws_subnet.public
+  subnet_id      = each.value.id
   route_table_id = aws_route_table.public.id
 }
 
 ############################
-# Private Route Table
+# Private Route Table (only if private subnet exists)
 ############################
 resource "aws_route_table" "private" {
+  count  = length(var.private_subnet_cidrs) > 0 ? 1 : 0
   vpc_id = aws_vpc.this.id
 
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.this.id
+    nat_gateway_id = aws_nat_gateway.this[0].id
   }
 
   tags = {
@@ -115,6 +120,7 @@ resource "aws_route_table" "private" {
 }
 
 resource "aws_route_table_association" "private" {
-  subnet_id      = aws_subnet.private.id
-  route_table_id = aws_route_table.private.id
+  for_each       = length(var.private_subnet_cidrs) > 0 ? aws_subnet.private : {}
+  subnet_id      = each.value.id
+  route_table_id = aws_route_table.private[0].id
 }

@@ -1,27 +1,26 @@
-variable "aws_region" {
-  description = "AWS region"
+variable "env" {
   type        = string
+  description = "Environment name (dev/stage/prod)"
 }
 
-variable "env" {
-  description = "Environment name (dev/stage/prod)"
+variable "aws_region" {
   type        = string
+  description = "AWS region"
 }
 
 variable "vpc_cidr" {
-  description = "CIDR block for VPC"
   type        = string
-  default     = "10.0.0.0/16"
+  description = "CIDR block for the VPC"
 }
 
-variable "public_subnet_cidr" {
-  description = "CIDR for public subnet"
-  type        = string
-  default     = "10.0.1.0/24"
+variable "public_subnet_cidrs" {
+  type        = list(string)
+  description = "List of public subnet CIDRs"
+  default     = []
 }
 
-variable "private_subnet_cidr" {
-  description = "CIDR for private subnet"
-  type        = string
-  default     = "10.0.2.0/24"
+variable "private_subnet_cidrs" {
+  type        = list(string)
+  description = "List of private subnet CIDRs"
+  default     = []
 }
