@@ -4,7 +4,7 @@
 resource "aws_eks_cluster" "mlops" {
   name     = "${var.env}-${var.cluster_name}"
   role_arn = aws_iam_role.eks_cluster_role.arn
-  version  = "1.28"
+  version  = "1.34"
 
   vpc_config {
     subnet_ids = local.public_subnet_ids
