@@ -4,7 +4,7 @@
 resource "aws_eks_cluster" "mlops" {
   name     = "${var.env}-${var.cluster_name}"
   role_arn = aws_iam_role.eks_cluster_role.arn
-  version  = "1.34"
+  version  = "1.33"
 
   vpc_config {
     subnet_ids = local.public_subnet_ids
@@ -24,7 +24,7 @@ resource "aws_eks_node_group" "mlops_nodes" {
   node_group_name = "${var.env}-${var.cluster_name}-ng"
   node_role_arn   = aws_iam_role.eks_node_role.arn
   subnet_ids      = local.public_subnet_ids
-  ami_type        = "AL2_x86_64"
+  ami_type        = "AL2023_x86_64"
 
   scaling_config {
     desired_size = 2
@@ -32,7 +32,7 @@ resource "aws_eks_node_group" "mlops_nodes" {
     max_size     = 3
   }
 
-  instance_types = ["t3.medium"]
+  instance_types = ["t2.micro"]
   disk_size      = 20
 
   tags = {
