@@ -27,31 +27,30 @@ resource "aws_internet_gateway" "this" {
 # Public Subnets
 ############################
 resource "aws_subnet" "public" {
-  for_each = { for idx, cidr in var.public_subnet_cidrs : idx => cidr }
-
-  vpc_id                  = aws_vpc.this.id
-  cidr_block              = each.value
+  count                  = length(var.public_subnet_cidrs)
+  vpc_id                 = aws_vpc.this.id
+  cidr_block             = var.public_subnet_cidrs[count.index]
   map_public_ip_on_launch = true
-  availability_zone       = "${var.aws_region}${char(97 + each.key)}" # a, b, c ...
+  availability_zone      = data.aws_availability_zones.available.names[count.index % length(data.aws_availability_zones.available.names)]
 
   tags = {
-    Name = "${var.env}-public-subnet-${each.key + 1}"
+    Name = "${var.env}-public-subnet-${count.index + 1}"
     Tier = "public"
   }
 }
+
 
 ############################
 # Private Subnets
 ############################
 resource "aws_subnet" "private" {
-  for_each = { for idx, cidr in var.private_subnet_cidrs : idx => cidr }
-
+  count             = length(var.private_subnet_cidrs)
   vpc_id            = aws_vpc.this.id
-  cidr_block        = each.value
-  availability_zone = "${var.aws_region}${char(97 + each.key)}"
+  cidr_block        = var.private_subnet_cidrs[count.index]
+  availability_zone = data.aws_availability_zones.available.names[count.index % length(data.aws_availability_zones.available.names)]
 
   tags = {
-    Name = "${var.env}-private-subnet-${each.key + 1}"
+    Name = "${var.env}-private-subnet-${count.index + 1}"
     Tier = "private"
   }
 }
