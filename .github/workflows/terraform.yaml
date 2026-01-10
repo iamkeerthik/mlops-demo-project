@@ -91,8 +91,10 @@ jobs:
       # ---------- TERRAFORM INIT / PLAN ----------
       - name: Terraform Init & Plan
         id: plan
-        continue-on-error: true
+        #continue-on-error: true
         run: |
+          set -e   # Fail immediately if any command errors
+          
           ENV="${{ github.event.inputs.environment }}"
           ACTION="${{ github.event.inputs.action }}"
           BUCKET="${ENV}-tf-state-keerth"
