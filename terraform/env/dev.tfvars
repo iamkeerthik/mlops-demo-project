@@ -8,6 +8,6 @@ public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
 cluster_name        = "dev-mlops"
 
 vpc_name            = "dev-mlops-vpc"
-public_subnet_names = ["dev-public-subnet-0", "dev-public-subnet-1"]
+public_subnet_names = ["dev-public-subnet-1", "dev-public-subnet-2"]
 
 bucket_name     = "mlops-prod-artifacts-keerth"
