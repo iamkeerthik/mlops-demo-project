@@ -1,0 +1,208 @@
+name: Terraform CD with Infra Cost
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Terraform action
+        required: true
+        default: plan
+        type: choice
+        options: [plan, apply, destroy]
+
+      environment:
+        description: Terraform environment
+        required: true
+        default: dev
+        type: choice
+        options: [dev, stage, prod]
+
+      tf_component:
+        description: "Terraform components (s3 | s3,eks | all)"
+        required: true
+        default: all
+        type: string
+
+env:
+  AWS_REGION: ap-south-1
+  TF_ROOT: terraform
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ---------- CHECKOUT ----------
+      - uses: actions/checkout@v4
+
+      # ---------- SETUP ----------
+      - uses: hashicorp/setup-terraform@v3
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ---------- SAFETY ----------
+      - name: Prevent destroy all in prod
+        if: github.event.inputs.action == 'destroy' && github.event.inputs.environment == 'prod' && github.event.inputs.tf_component == 'all'
+        run: |
+          echo "❌ Destroy ALL in prod is blocked"
+          exit 1
+
+      # ---------- RESOLVE COMPONENTS ----------
+      - name: Resolve Terraform components
+        id: components
+        run: |
+          INPUT=$(echo "${{ github.event.inputs.tf_component }}" | tr -d ' ')
+          BASE="$TF_ROOT"
+
+          if [ "$INPUT" = "all" ]; then
+            COMPONENTS="bootstrap s3 eks"
+          else
+            IFS=',' read -ra LIST <<< "$INPUT"
+            COMPONENTS=""
+            for c in "${LIST[@]}"; do
+              if [ ! -d "$BASE/$c" ]; then
+                echo "❌ Component not found: $c"
+                exit 1
+              fi
+              COMPONENTS="$COMPONENTS $c"
+            done
+          fi
+
+          COMPONENTS=$(echo "$COMPONENTS" | xargs)
+          echo "components=$COMPONENTS" >> $GITHUB_OUTPUT
+          echo "✅ Components: $COMPONENTS"
+
+      # ---------- TERRAFORM INIT / PLAN ----------
+      - name: Terraform Init & Plan
+        id: plan
+        continue-on-error: true
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          ACTION="${{ github.event.inputs.action }}"
+          BUCKET="${ENV}-tf-state-keerth"
+
+          rm -f plan.txt
+
+          for c in ${{ steps.components.outputs.components }}; do
+            echo "=============================="
+            echo "Component : $c"
+            echo "Env       : $ENV"
+            echo "Bucket    : $BUCKET"
+            echo "State Key : ${ENV}/${c}/default.tfstate"
+            echo "=============================="
+
+            # Inject common terraform files
+            cp -r $TF_ROOT/_common/* $TF_ROOT/$c/
+
+            terraform -chdir=$TF_ROOT/$c init \
+              -backend-config="bucket=$BUCKET" \
+              -backend-config="key=${ENV}/${c}/default.tfstate"
+
+            if [ "$ACTION" = "destroy" ]; then
+              terraform -chdir=$TF_ROOT/$c plan -destroy \
+                -var-file=../env/$ENV.tfvars \
+                -out=tfplan
+            else
+              terraform -chdir=$TF_ROOT/$c plan \
+                -var-file=../env/$ENV.tfvars \
+                -out=tfplan
+            fi
+
+            terraform -chdir=$TF_ROOT/$c show -no-color tfplan > $GITHUB_WORKSPACE/plan-$c.txt
+            terraform -chdir=$TF_ROOT/$c show -json tfplan > $GITHUB_WORKSPACE/plan-$c.json
+
+            echo -e "\n\n---\n## 📦 Component: $c\n" >> plan.txt
+            cat plan-$c.txt >> plan.txt
+          done
+
+      # ---------- INFRACOST ----------
+      - uses: infracost/actions/setup@v2
+        with:
+          version: "0.10.31"
+
+      - run: infracost configure set api_key ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Infracost breakdown
+        run: |
+          for c in ${{ steps.components.outputs.components }}; do
+            infracost breakdown \
+              --path=plan-$c.json \
+              --format=json \
+              --out-file=/tmp/infracost-$c.json
+
+            infracost output \
+              --path=/tmp/infracost-$c.json \
+              --format=github-comment \
+              --out-file=infracost-$c.md
+
+            echo -e "\n\n## 💰 Cost: $c\n" >> plan.txt
+            cat infracost-$c.md >> plan.txt
+          done
+
+      # ---------- APPROVAL ----------
+      - name: Add approval instructions
+        if: github.event.inputs.action != 'plan'
+        run: |
+          echo -e "\n\n---\n💬 **Approval Required**\nComment **yes** to approve or **no** to cancel." >> plan.txt
+
+      - name: Create approval issue
+        if: github.event.inputs.action != 'plan'
+        id: issue
+        uses: peter-evans/create-issue-from-file@v5
+        with:
+          title: "Terraform Approval: ${{ github.event.inputs.action }} | ${{ github.event.inputs.environment }}"
+          content-filepath: plan.txt
+          labels: terraform,approval
+          assignees: ${{ github.actor }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for approval
+        if: github.event.inputs.action != 'plan'
+        id: wait
+        run: |
+          ISSUE=${{ steps.issue.outputs.issue-number }}
+
+          for i in {1..30}; do
+            comment=$(gh issue view $ISSUE --json comments --jq '.comments[-1].body' || echo "")
+            if [[ "$comment" =~ ^[Yy][Ee][Ss]$ ]]; then
+              echo "approval=yes" >> $GITHUB_OUTPUT
+              exit 0
+            elif [[ "$comment" =~ ^[Nn][Oo]$ ]]; then
+              echo "approval=no" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            sleep 20
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ---------- APPLY ----------
+      - name: Terraform Apply
+        if: steps.wait.outputs.approval == 'yes' && github.event.inputs.action == 'apply'
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          BUCKET="${ENV}-tf-state-keerth"
+
+          for c in ${{ steps.components.outputs.components }}; do
+            terraform -chdir=$TF_ROOT/$c apply -auto-approve \
+              -var-file=../env/$ENV.tfvars
+          done
+
+      # ---------- DESTROY ----------
+      - name: Terraform Destroy
+        if: steps.wait.outputs.approval == 'yes' && github.event.inputs.action == 'destroy'
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          for c in ${{ steps.components.outputs.components }}; do
+            terraform -chdir=$TF_ROOT/$c destroy -auto-approve \
+              -var-file=../env/$ENV.tfvars
+          done
