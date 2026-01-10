@@ -60,21 +60,42 @@ jobs:
         id: components
         run: |
           INPUT=$(echo "${{ github.event.inputs.tf_component }}" | tr -d ' ')
+          ACTION="${{ github.event.inputs.action }}"
           BASE="$TF_ROOT"
 
-          if [ "$INPUT" = "all" ]; then
-            echo "📦 Detecting all components dynamically..."
-            COMPONENTS=""
+          get_all_components() {
             for dir in "$BASE"/*/ ; do
-              dir_name=$(basename "$dir")
-              # Skip hidden or special folders like _common
-              if [[ "$dir_name" != "_common" && -d "$BASE/$dir_name" ]]; then
-                COMPONENTS="$COMPONENTS $dir_name"
+              name=$(basename "$dir")
+              if [[ "$name" != "_common" ]]; then
+                echo "$name"
               fi
             done
+          }
+
+          if [ "$INPUT" = "all" ]; then
+            echo "📦 Detecting all components..."
+
+            BOOTSTRAP=""
+            OTHERS=()
+
+            for c in $(get_all_components); do
+              if [ "$c" = "bootstrap" ]; then
+                BOOTSTRAP="bootstrap"
+              else
+                OTHERS+=("$c")
+              fi
+            done
+
+            if [ "$ACTION" = "destroy" ]; then
+              COMPONENTS="${OTHERS[*]} $BOOTSTRAP"
+            else
+              COMPONENTS="$BOOTSTRAP ${OTHERS[*]}"
+            fi
+
           else
             IFS=',' read -ra LIST <<< "$INPUT"
             COMPONENTS=""
+
             for c in "${LIST[@]}"; do
               if [ ! -d "$BASE/$c" ]; then
                 echo "❌ Component not found: $c"
@@ -86,7 +107,7 @@ jobs:
 
           COMPONENTS=$(echo "$COMPONENTS" | xargs)
           echo "components=$COMPONENTS" >> $GITHUB_OUTPUT
-          echo "✅ Components: $COMPONENTS"
+          echo "✅ Execution order: $COMPONENTS"
 
       # ---------- TERRAFORM INIT / PLAN ----------
       - name: Terraform Init & Plan
@@ -94,7 +115,7 @@ jobs:
         #continue-on-error: true
         run: |
           set -e   # Fail immediately if any command errors
-          
+
           ENV="${{ github.event.inputs.environment }}"
           ACTION="${{ github.event.inputs.action }}"
           BUCKET="${ENV}-tf-state-keerth"
