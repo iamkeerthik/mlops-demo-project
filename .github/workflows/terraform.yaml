@@ -63,7 +63,15 @@ jobs:
           BASE="$TF_ROOT"
 
           if [ "$INPUT" = "all" ]; then
-            COMPONENTS="bootstrap s3 eks"
+            echo "📦 Detecting all components dynamically..."
+            COMPONENTS=""
+            for dir in "$BASE"/*/ ; do
+              dir_name=$(basename "$dir")
+              # Skip hidden or special folders like _common
+              if [[ "$dir_name" != "_common" && -d "$BASE/$dir_name" ]]; then
+                COMPONENTS="$COMPONENTS $dir_name"
+              fi
+            done
           else
             IFS=',' read -ra LIST <<< "$INPUT"
             COMPONENTS=""
