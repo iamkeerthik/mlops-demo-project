@@ -143,7 +143,12 @@ jobs:
               --format=github-comment \
               --out-file=infracost-$c.md
 
-            echo -e "\n\n## 💰 Cost: $c\n" >> plan.txt
+            # Print markdown to GitHub Actions log
+            echo -e "\n\n### 💰 Cost changes for $c\n"
+            cat infracost-$c.md
+
+            # Append to plan.txt for approval issue
+            echo -e "\n\n## 💰 Cost changes: $c\n" >> plan.txt
             cat infracost-$c.md >> plan.txt
           done
 
