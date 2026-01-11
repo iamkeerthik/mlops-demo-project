@@ -1,1 +1,34 @@
-{}
+replicaCount: 1
+
+image:
+  repository: ghcr.io/mlflow/mlflow
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 5000
+
+backendStore:
+  type: file
+  file:
+    path: /mlflow/mlruns
+
+artifactStore:
+  type: file
+  file:
+    path: /mlflow/artifacts
+
+extraArgs:
+  - "--host=0.0.0.0"
+  - "--port=5000"
+
+persistence:
+  enabled: false
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"

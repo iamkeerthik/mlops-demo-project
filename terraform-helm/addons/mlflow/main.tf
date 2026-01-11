@@ -1,13 +1,16 @@
 resource "helm_release" "mlflow" {
-  name             = "mlflow"
-  namespace        = "mlflow"
-  create_namespace = true
-
+  name       = "mlflow"
   repository = "https://community-charts.github.io/helm-charts"
   chart      = "mlflow"
-  version    = "0.7.19"
+  namespace  = "mlflow"
+  version    = "0.7.19" # stable
+
+  create_namespace = true
 
   values = [
     file("${path.module}/values/${var.env}.yaml")
   ]
+
+  wait    = true
+  timeout = 600
 }

@@ -1,0 +1,15 @@
+replicaCount: 1
+
+# Lightweight resource limits
+resources:
+  requests:
+    cpu: 50m
+    memory: 50Mi
+  limits:
+    cpu: 100m
+    memory: 100Mi
+
+# Cluster role binding, mostly defaults
+args:
+  - --kubelet-insecure-tls
+  - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname

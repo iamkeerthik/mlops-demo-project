@@ -1,0 +1,65 @@
+# ---------- Disable heavy components ----------
+alertmanager:
+  enabled: false
+
+kubeControllerManager:
+  enabled: false
+
+kubeScheduler:
+  enabled: false
+
+kubeProxy:
+  enabled: false
+
+kubeEtcd:
+  enabled: false
+
+# ---------- Prometheus (very light) ----------
+prometheus:
+  enabled: true
+  prometheusSpec:
+    retention: 2d
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 300Mi
+      limits:
+        cpu: 300m
+        memory: 600Mi
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+
+# ---------- Grafana (light) ----------
+grafana:
+  enabled: true
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 100Mi
+    limits:
+      cpu: 200m
+      memory: 300Mi
+
+  service:
+    type: ClusterIP
+
+  adminUser: admin
+  adminPassword: admin123
+
+# ---------- Node exporter (keep, but light) ----------
+nodeExporter:
+  enabled: true
+
+# ---------- Disable default rules (huge memory saver) ----------
+defaultRules:
+  create: false
