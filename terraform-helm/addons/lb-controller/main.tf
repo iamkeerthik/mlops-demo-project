@@ -1,3 +1,23 @@
+
+data "aws_eks_cluster" "eks" {
+  name = "${var.env}-mlops-cluster"
+}
+
+data "aws_eks_cluster_auth" "eks" {
+  name = "${var.env}-mlops-cluster"
+}
+
+data "aws_vpc" "eks_vpc" {
+  id = data.aws_eks_cluster.eks.vpc_config[0].vpc_id
+}
+
+data "aws_subnets" "eks_subnets" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.eks_vpc.id]
+  }
+}
+
 resource "aws_iam_role" "alb_controller" {
   name = "${var.env}-alb-controller-role"
 
@@ -19,9 +39,9 @@ resource "aws_iam_role_policy_attachment" "alb_controller_attach" {
   policy_arn = "arn:aws:iam::aws:policy/AWSLoadBalancerControllerIAMPolicy"
 }
 
-resource "kubernetes_service_account" "alb_controller" {
+resource "kubernetes_service_account_v1" "alb_controller" {
   metadata {
-    name      = "aws-load-balancer-controller"
+    name      = "alb-controller"
     namespace = "kube-system"
     annotations = {
       "eks.amazonaws.com/role-arn" = aws_iam_role.alb_controller.arn
