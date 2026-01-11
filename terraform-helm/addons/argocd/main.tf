@@ -8,7 +8,7 @@ resource "helm_release" "argocd" {
   create_namespace = true
 
   values = [
-    file("${path.module}/values/argocd/${var.env}.yaml")
+    file("${path.module}/values/${var.env}.yaml")
   ]
 
   wait    = true
