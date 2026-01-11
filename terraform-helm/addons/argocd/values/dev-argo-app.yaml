@@ -7,9 +7,9 @@ spec:
   project: default
 
   source:
-    repoURL: 'https://github.com/<your-org>/<your-repo>.git'
+    repoURL: 'https://github.com/iamkeerthik/mlops-demo-project.git'
     targetRevision: main
-    path: 'mlops/apps/model-1'   # <-- folder containing deploy.yaml
+    path: 'mlops/apps/model-1'   # make sure folder exists exactly like this
 
   destination:
     server: 'https://kubernetes.default.svc'
