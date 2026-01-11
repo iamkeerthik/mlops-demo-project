@@ -1,18 +1,23 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: mlops-apps
+  name: model-1
   namespace: argocd
 spec:
   project: default
+
   source:
-    repoURL: 'https://github.com/iamkeerthik/mlops-demo-project'
+    repoURL: 'https://github.com/<your-org>/<your-repo>.git'
     targetRevision: main
-    path: mlops/apps
+    path: 'mlops/apps/model-1'   # <-- folder containing deploy.yaml
+
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: mlops-apps
+    namespace: mlops
+
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
