@@ -10,4 +10,4 @@ cluster_name        = "mlops-cluster"
 vpc_name            = "dev-mlops-vpc"
 public_subnet_names = ["dev-public-subnet-1", "dev-public-subnet-2"]
 
-bucket_name     = "mlops-prod-artifacts-keerth"
+bucket_name     = "mlops-dvc-keerth"

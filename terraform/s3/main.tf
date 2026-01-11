@@ -16,14 +16,14 @@ resource "aws_s3_bucket" "mlops" {
 # -----------------------------
 # Public Access Block (disabled for testing)
 # -----------------------------
-resource "aws_s3_bucket_public_access_block" "mlops" {
-  bucket = aws_s3_bucket.mlops.id
+# resource "aws_s3_bucket_public_access_block" "mlops" {
+#   bucket = aws_s3_bucket.mlops.id
 
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
-}
+#   block_public_acls       = false
+#   block_public_policy     = false
+#   ignore_public_acls      = false
+#   restrict_public_buckets = false
+# }
 
 # -----------------------------
 # Bucket ACL (make public for testing)
