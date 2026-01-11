@@ -1,16 +1,15 @@
 resource "helm_release" "metrics_server" {
-  name       = "metrics-server"
-  repository = "https://kubernetes-sigs.github.io/metrics-server/"
-  chart      = "metrics-server"
-  version    = "6.3.0"
-
-  namespace        = "monitoring"
-  create_namespace = true
+  name             = "metrics-server"
+  repository       = "https://kubernetes-sigs.github.io/metrics-server/"
+  chart            = "metrics-server"
+  namespace        = "kube-system"
+  create_namespace = false
+  wait             = true
+  timeout          = 300
 
   values = [
-    file("${path.module}/values/metrics-server.yaml")
+    yamlencode({
+      args = ["--kubelet-insecure-tls"]
+    })
   ]
-
-  wait    = true
-  timeout = 300
 }
