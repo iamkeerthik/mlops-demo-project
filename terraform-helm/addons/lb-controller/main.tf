@@ -1,4 +1,7 @@
-
+variable "region" {
+  type = string
+  default = "ap-south-1"
+}
 data "aws_eks_cluster" "eks" {
   name = "${var.env}-mlops-cluster"
 }
