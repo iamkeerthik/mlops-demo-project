@@ -1,4 +1,4 @@
-resource "helm_release" "kube_prometheus_stack" {
+resource "helm_release" "kube_prometheus_stackk" {
   name       = "kube-prometheus-stack"
 
   repository = "https://prometheus-community.github.io/helm-charts"
