@@ -24,3 +24,8 @@ variable "private_subnet_cidrs" {
   description = "List of private subnet CIDRs"
   default     = []
 }
+
+variable "ecr_repo_name" {
+  type    = string
+  default = "app"
+}

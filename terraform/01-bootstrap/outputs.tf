@@ -21,3 +21,8 @@ output "nat_gateway_id" {
   description = "NAT Gateway ID (if private subnets exist)"
   value       = length(aws_nat_gateway.this) > 0 ? aws_nat_gateway.this[0].id : ""
 }
+
+
+output "ecr_repository_url" {
+  value = aws_ecr_repository.app.repository_url
+}
