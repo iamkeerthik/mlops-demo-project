@@ -4,46 +4,92 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment (dev/stage/prod)"
+        description: "Environment to deploy (dev/stage/prod)"
         required: true
         default: dev
+        type: choice
+        options:
+          - dev
+          - stage
+          - prod
+
       path:
-        description: "Path to manifests in repo"
+        description: "Path to manifests in repo (file or folder)"
         required: true
         default: terraform-helm/addons/argocd/values/dev-argo-app.yaml
+
+      action:
+        description: "Apply or destroy manifests"
+        required: true
+        default: apply
+        type: choice
+        options:
+          - apply
+          - destroy
+
+env:
+  AWS_REGION: ap-south-1
 
 jobs:
   apply-manifests:
     runs-on: ubuntu-latest
 
     steps:
+      # ---------- CHECKOUT ----------
       - uses: actions/checkout@v4
 
+      # ---------- AWS CREDENTIALS ----------
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
+          aws-region: ${{ env.AWS_REGION }}
 
+      # ---------- INSTALL KUBECTL ----------
       - name: Install kubectl
         run: |
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/
 
+      # ---------- CONFIGURE KUBECONFIG ----------
       - name: Configure kubeconfig
         run: |
-          aws eks update-kubeconfig --name ${ENV}-mlops-cluster --region ap-south-1
+          ENV="${{ github.event.inputs.environment }}"
+          CLUSTER_NAME="${ENV}-mlops-cluster"
+          echo "Using cluster: $CLUSTER_NAME"
+          aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_REGION
 
-      - name: Apply manifests
+      # ---------- APPLY OR DESTROY ----------
+      - name: Apply or Destroy Manifests
         run: |
-          if [ -f "${{ github.event.inputs.path }}" ]; then
-            echo "Applying single file..."
-            kubectl apply -f ${{ github.event.inputs.path }}
-          elif [ -d "${{ github.event.inputs.path }}" ]; then
-            echo "Applying directory recursively..."
-            kubectl apply -f ${{ github.event.inputs.path }} --recursive
+          ACTION="${{ github.event.inputs.action }}"
+          PATH_INPUT="${{ github.event.inputs.path }}"
+
+          if [ ! -e "$PATH_INPUT" ]; then
+            echo "❌ Path not found: $PATH_INPUT"
+            exit 1
+          fi
+
+          if [ "$ACTION" = "apply" ]; then
+            if [ -f "$PATH_INPUT" ]; then
+              echo "Applying single file: $PATH_INPUT"
+              kubectl apply -f "$PATH_INPUT"
+            else
+              echo "Applying directory recursively: $PATH_INPUT"
+              kubectl apply -f "$PATH_INPUT" --recursive
+            fi
+
+          elif [ "$ACTION" = "destroy" ]; then
+            if [ -f "$PATH_INPUT" ]; then
+              echo "Deleting single file: $PATH_INPUT"
+              kubectl delete -f "$PATH_INPUT" --ignore-not-found
+            else
+              echo "Deleting directory recursively: $PATH_INPUT"
+              kubectl delete -f "$PATH_INPUT" --recursive --ignore-not-found
+            fi
+
           else
-            echo "❌ Path not found: ${{ github.event.inputs.path }}"
+            echo "❌ Unknown action: $ACTION"
             exit 1
           fi
