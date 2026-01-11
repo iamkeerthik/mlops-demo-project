@@ -1,0 +1,110 @@
+name: Terraform Helm Addons CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Terraform action
+        required: true
+        default: plan
+        type: choice
+        options: [plan, apply, destroy]
+
+      environment:
+        description: Environment
+        required: true
+        default: dev
+        type: choice
+        options: [dev, stage, prod]
+
+      addon:
+        description: "Helm addons (argocd | mlflow | kserve | all)"
+        required: true
+        default: all
+        type: string
+
+env:
+  AWS_REGION: ap-south-1
+  TF_ROOT: terraform-helm
+
+permissions:
+  contents: read
+
+jobs:
+  helm-terraform:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Prevent destroy all in prod
+        if: github.event.inputs.action == 'destroy' &&
+            github.event.inputs.environment == 'prod' &&
+            github.event.inputs.addon == 'all'
+        run: |
+          echo "❌ Destroy ALL helm addons in prod is blocked"
+          exit 1
+
+      - name: Resolve addons
+        id: addons
+        run: |
+          INPUT=$(echo "${{ github.event.inputs.addon }}" | tr -d ' ')
+          BASE="$TF_ROOT/addons"
+
+          if [ "$INPUT" = "all" ]; then
+            ADDONS=$(ls -d $BASE/*/ | xargs -n1 basename)
+          else
+            IFS=',' read -ra LIST <<< "$INPUT"
+            ADDONS=""
+            for a in "${LIST[@]}"; do
+              if [ ! -d "$BASE/$a" ]; then
+                echo "❌ Addon not found: $a"
+                exit 1
+              fi
+              ADDONS="$ADDONS $a"
+            done
+          fi
+
+          ADDONS=$(echo "$ADDONS" | xargs)
+          echo "addons=$ADDONS" >> $GITHUB_OUTPUT
+          echo "✅ Addons selected: $ADDONS"
+
+      - name: Terraform ${{ github.event.inputs.action }}
+        run: |
+          set -e
+
+          ENV="${{ github.event.inputs.environment }}"
+          ACTION="${{ github.event.inputs.action }}"
+          BUCKET="${ENV}-tf-state-keerth"
+
+          for a in ${{ steps.addons.outputs.addons }}; do
+            echo "================================="
+            echo "Addon : $a"
+            echo "Env   : $ENV"
+            echo "================================="
+
+            cp -r $TF_ROOT/_common/* $TF_ROOT/addons/$a/
+
+            terraform -chdir=$TF_ROOT/addons/$a init \
+              -backend-config="bucket=$BUCKET" \
+              -backend-config="key=${ENV}/helm/${a}.tfstate"
+
+            if [ "$ACTION" = "plan" ]; then
+              terraform -chdir=$TF_ROOT/addons/$a plan \
+                -var="env=$ENV"
+            elif [ "$ACTION" = "apply" ]; then
+              terraform -chdir=$TF_ROOT/addons/$a apply -auto-approve \
+                -var="env=$ENV"
+            elif [ "$ACTION" = "destroy" ]; then
+              terraform -chdir=$TF_ROOT/addons/$a destroy -auto-approve \
+                -var="env=$ENV"
+            fi
+          done
