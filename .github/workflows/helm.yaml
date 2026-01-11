@@ -18,7 +18,7 @@ on:
         options: [dev, stage, prod]
 
       addon:
-        description: "Helm addons (argocd | mlflow | kserve | all)"
+        description: "Helm addons (argocd | mlflow | kserve | metrics-server | all)"
         required: true
         default: all
         type: string
@@ -35,8 +35,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ---------- CHECKOUT ----------
       - uses: actions/checkout@v4
 
+      # ---------- SETUP ----------
       - uses: hashicorp/setup-terraform@v3
 
       - uses: aws-actions/configure-aws-credentials@v4
@@ -45,6 +47,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      # ---------- SAFETY ----------
       - name: Prevent destroy all in prod
         if: github.event.inputs.action == 'destroy' &&
             github.event.inputs.environment == 'prod' &&
@@ -53,14 +56,22 @@ jobs:
           echo "❌ Destroy ALL helm addons in prod is blocked"
           exit 1
 
+      # ---------- RESOLVE ADDONS ----------
       - name: Resolve addons
         id: addons
         run: |
           INPUT=$(echo "${{ github.event.inputs.addon }}" | tr -d ' ')
           BASE="$TF_ROOT/addons"
 
+          get_all_addons() {
+            for dir in "$BASE"/*/ ; do
+              name=$(basename "$dir")
+              echo "$name"
+            done
+          }
+
           if [ "$INPUT" = "all" ]; then
-            ADDONS=$(ls -d $BASE/*/ | xargs -n1 basename)
+            ADDONS=$(get_all_addons)
           else
             IFS=',' read -ra LIST <<< "$INPUT"
             ADDONS=""
@@ -77,6 +88,7 @@ jobs:
           echo "addons=$ADDONS" >> $GITHUB_OUTPUT
           echo "✅ Addons selected: $ADDONS"
 
+      # ---------- TERRAFORM PLAN / APPLY / DESTROY ----------
       - name: Terraform ${{ github.event.inputs.action }}
         run: |
           set -e
@@ -89,22 +101,35 @@ jobs:
             echo "================================="
             echo "Addon : $a"
             echo "Env   : $ENV"
+            echo "Bucket: $BUCKET"
             echo "================================="
 
+            # Copy common providers/backend
             cp -r $TF_ROOT/_common/* $TF_ROOT/addons/$a/
 
+            # Determine values.yaml
+            VALUES_FILE="$TF_ROOT/addons/$a/values/$ENV.yaml"
+
+            # Init Terraform backend dynamically
             terraform -chdir=$TF_ROOT/addons/$a init \
               -backend-config="bucket=$BUCKET" \
               -backend-config="key=${ENV}/helm/${a}.tfstate"
 
+            # Run action
             if [ "$ACTION" = "plan" ]; then
               terraform -chdir=$TF_ROOT/addons/$a plan \
-                -var="env=$ENV"
+                -var="env=$ENV" \
+                -var="component=$a" \
+                -var="values_file=$VALUES_FILE"
             elif [ "$ACTION" = "apply" ]; then
               terraform -chdir=$TF_ROOT/addons/$a apply -auto-approve \
-                -var="env=$ENV"
+                -var="env=$ENV" \
+                -var="component=$a" \
+                -var="values_file=$VALUES_FILE"
             elif [ "$ACTION" = "destroy" ]; then
               terraform -chdir=$TF_ROOT/addons/$a destroy -auto-approve \
-                -var="env=$ENV"
+                -var="env=$ENV" \
+                -var="component=$a" \
+                -var="values_file=$VALUES_FILE"
             fi
           done
