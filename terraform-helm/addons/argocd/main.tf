@@ -1,13 +1,16 @@
 resource "helm_release" "argocd" {
-  name             = "argocd"
-  namespace        = "argocd"
-  create_namespace = true
-
+  name       = "argocd"
   repository = "https://argoproj.github.io/argo-helm"
   chart      = "argo-cd"
-  version    = "7.6.12"
+  namespace  = "argocd"
+  version    = "6.7.3"
+
+  create_namespace = true
 
   values = [
-    file("${path.module}/values/${var.env}.yaml")
+    file("${path.module}/values/argocd/${var.env}.yaml")
   ]
+
+  wait    = true
+  timeout = 600
 }
