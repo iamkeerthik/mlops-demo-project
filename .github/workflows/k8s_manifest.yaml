@@ -10,7 +10,7 @@ on:
       path:
         description: "Path to manifests in repo"
         required: true
-        default: k8s/apps
+        default: terraform-helm/addons/argocd/values/dev-argo-app.yaml
 
 jobs:
   apply-manifests:
