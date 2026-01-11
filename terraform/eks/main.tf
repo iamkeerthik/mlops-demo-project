@@ -24,7 +24,7 @@ resource "aws_eks_node_group" "mlops_nodes" {
   node_group_name = "${var.env}-${var.cluster_name}-ng"
   node_role_arn   = aws_iam_role.eks_node_role.arn
   subnet_ids      = local.public_subnet_ids
-  ami_type        = "AL2_x86_64"
+  ami_type        = "AL2023_x86_64_STANDARD"
 
   scaling_config {
     desired_size = 2
