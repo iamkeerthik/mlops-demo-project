@@ -1,0 +1,49 @@
+name: Kubernetes Manifests Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment (dev/stage/prod)"
+        required: true
+        default: dev
+      path:
+        description: "Path to manifests in repo"
+        required: true
+        default: k8s/apps
+
+jobs:
+  apply-manifests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      - name: Configure kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${ENV}-mlops-cluster --region ap-south-1
+
+      - name: Apply manifests
+        run: |
+          if [ -f "${{ github.event.inputs.path }}" ]; then
+            echo "Applying single file..."
+            kubectl apply -f ${{ github.event.inputs.path }}
+          elif [ -d "${{ github.event.inputs.path }}" ]; then
+            echo "Applying directory recursively..."
+            kubectl apply -f ${{ github.event.inputs.path }} --recursive
+          else
+            echo "❌ Path not found: ${{ github.event.inputs.path }}"
+            exit 1
+          fi
