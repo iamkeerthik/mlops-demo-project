@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: model-1
-          image: 688349427813.dkr.ecr.ap-south-1.amazonaws.com/app:model-1-dev-535afe9
+          image: 688349427813.dkr.ecr.ap-south-1.amazonaws.com/app:model1-dev-a54bfe0
           imagePullPolicy: Always
           ports:
             - containerPort: 5000
