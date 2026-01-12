@@ -11,3 +11,8 @@ vpc_name            = "dev-mlops-vpc"
 public_subnet_names = ["dev-public-subnet-1", "dev-public-subnet-2"]
 
 bucket_name     = "mlops-dvc-keerth"
+
+buckets = {
+  dvc      = "mlops-dvc-keerth"
+  models   = "mlops-kserve-keerth"
+}

@@ -27,7 +27,7 @@ spec:
     model:
       modelFormat:
         name: sklearn
-      storageUri: s3://mlops-models-kserve-keerth/intent/model.joblib
+      storageUri: s3://mlops-kserve-keerth/intent-classifier/intent_model.pkl
       resources:
         requests:
           cpu: "100m"
