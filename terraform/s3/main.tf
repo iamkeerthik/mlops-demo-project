@@ -37,7 +37,7 @@ resource "aws_s3_bucket_policy" "mlops_root_access" {
         Sid       = "RootFullAccess"
         Effect    = "Allow"
         Principal = {
-          AWS = "arn:aws:iam::688349427813:root"  # your root account
+          AWS = "arn:aws:iam::688349427813:root"  # your  account
         }
         Action   = "s3:*"
         Resource = [

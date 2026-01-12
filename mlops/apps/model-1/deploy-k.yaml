@@ -1,0 +1,37 @@
+# File: mlops/apps/model-1/deploy-k.yaml
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: intent
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kserve-sa
+  namespace: intent
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::688349427813:role/kserve-role
+
+---
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: intent-classifier
+  namespace: intent
+spec:
+  predictor:
+    serviceAccountName: kserve-sa
+    model:
+      modelFormat:
+        name: sklearn
+      storageUri: s3://mlops-models-kserve-keerth/intent/model.joblib
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "512Mi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"

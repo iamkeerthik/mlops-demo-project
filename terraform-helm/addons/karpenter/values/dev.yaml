@@ -1,0 +1,20 @@
+clusterName: "dev-mlops-cluster"
+clusterEndpoint: "https://<EKS_CLUSTER_ENDPOINT>"
+aws:
+  defaultInstanceProfile: "KarpenterNodeInstanceProfile-dev"
+  # optional: serviceAccountRole
+serviceAccount:
+  create: true
+  name: karpenter-sa
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::<ACCOUNT_ID>:role/KarpenterControllerRole"
+controller:
+  logLevel: info
+  # Optional node template defaults
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
