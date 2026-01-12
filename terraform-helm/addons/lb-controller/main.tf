@@ -21,33 +21,33 @@ data "aws_subnets" "eks_subnets" {
   }
 }
 
-resource "aws_iam_role" "alb_controller" {
-  name = "${var.env}-alb-controller-role"
+# resource "aws_iam_role" "alb_controller" {
+#   name = "${var.env}-alb-controller-role"
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Principal = {
-        Service = "eks.amazonaws.com"
-      }
-      Action = "sts:AssumeRole"
-    }]
-  })
-}
+#   assume_role_policy = jsonencode({
+#     Version = "2012-10-17"
+#     Statement = [{
+#       Effect = "Allow"
+#       Principal = {
+#         Service = "eks.amazonaws.com"
+#       }
+#       Action = "sts:AssumeRole"
+#     }]
+#   })
+# }
 
-# Attach pre-existing AWS policy
-resource "aws_iam_role_policy_attachment" "alb_controller_attach" {
-  role       = aws_iam_role.alb_controller.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSLoadBalancerControllerIAMPolicy"
-}
+# # Attach pre-existing AWS policy
+# resource "aws_iam_role_policy_attachment" "alb_controller_attach" {
+#   role       = aws_iam_role.alb_controller.name
+#   policy_arn = "arn:aws:iam::aws:policy/AWSLoadBalancerControllerIAMPolicy"
+# }
 
 resource "kubernetes_service_account_v1" "alb_controller" {
   metadata {
     name      = "alb-controller"
     namespace = "kube-system"
     annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.alb_controller.arn
+      "eks.amazonaws.com/role-arn" = "${var.env}-alb-controller-role"
     }
   }
 }
